@@ -1,4 +1,4 @@
-# CLARIS
+# CLARIS AI
 
 **Multi-style video captioning that stays true to what's on screen.**
 
