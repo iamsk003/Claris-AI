@@ -461,7 +461,16 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     async def health() -> dict:
+        # Deliberately trivial: no dependencies, no engine imports. Answers before any model
+        # is loaded so a platform health check always succeeds.
         return {"status": "ok"}
+
+    @app.exception_handler(Exception)
+    async def _unhandled(_request, exc: Exception) -> JSONResponse:
+        # Last-resort net: any unexpected error becomes a clean JSON 500 rather than a
+        # dropped connection, so a single bad request can never take the process down.
+        _log(logging.ERROR, "unhandled request error", error=repr(exc))
+        return JSONResponse(status_code=500, content={"error": "internal server error"})
 
     @app.post("/api/clips")
     async def create_clip(file: UploadFile = File(...)) -> JSONResponse:
@@ -519,4 +528,15 @@ def create_app() -> FastAPI:
     return app
 
 
-__all__ = ["create_app"]
+# A module-level ASGI app so the service starts under *any* conventional command —
+# ``uvicorn claris.api.main:app`` — not only the ``create_app --factory`` form. Without this,
+# a platform that auto-detects the entrypoint (or a start command that drops ``--factory``, or
+# gunicorn, or an older uvicorn that doesn't auto-detect factories) calls the factory itself
+# as the ASGI app: startup "succeeds", then every request invokes ``create_app(scope, receive,
+# send)``, which raises — surfacing as a 502 at the proxy. Building the app here is cheap:
+# create_app() does no heavy work and imports no ML, so this module stays light and /health
+# needs nothing loaded.
+app = create_app()
+
+
+__all__ = ["create_app", "app"]
