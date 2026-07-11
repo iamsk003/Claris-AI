@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --grain: 0.015;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-bay-bg text-bay-ink font-sans antialiased;
+    /* Faint film-grain wash so the greys read as a graded image, not flat CSS. */
+    background-image: radial-gradient(
+      1200px 800px at 70% -10%,
+      rgba(255, 176, 58, 0.04),
+      transparent 60%
+    );
+  }
+
+  /* All numeric data — timecodes, evidence IDs, scores, seeds — is set in mono. */
+  .num {
+    @apply font-mono tabular-nums tracking-tight;
+  }
+
+  ::selection {
+    background: rgba(255, 176, 58, 0.28);
+  }
+
+  /* Visible keyboard focus everywhere, in the signal color. */
+  :focus-visible {
+    outline: 2px solid theme("colors.signal.DEFAULT");
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Quiet, thin scrollbars in keeping with a tool UI. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme("colors.bay.line-2") transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: theme("colors.bay.line-2");
+    border-radius: 6px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-lg border border-bay-line bg-bay-panel shadow-panel;
+  }
+  .hairline {
+    @apply border-bay-line;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded border border-bay-line bg-bay-raised px-2 py-0.5 text-xs text-bay-ink-2;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md border border-bay-line-2 bg-bay-raised px-4 py-2 text-sm font-medium text-bay-ink transition-colors hover:border-signal/60 hover:bg-bay-line disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .btn-signal {
+    @apply border-signal/40 bg-signal/10 text-signal hover:border-signal hover:bg-signal/20;
+  }
+}
+
+/* Honor reduced-motion: kill decorative animation, keep instant state changes. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
