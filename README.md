@@ -46,6 +46,14 @@ CLARIS brings together leading open models and infrastructure:
    local `.env` file is supported).
 3. Point CLARIS at a video clip to receive its four captions.
 
+## Docker
+
+Pull the latest image:
+
+```bash
+docker pull ghcr.io/iamsk003/claris-ai:latest
+```
+
 ## License
 
 CLARIS is released under the MIT License. See [LICENSE](LICENSE) for details.
