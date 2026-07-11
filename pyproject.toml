@@ -15,6 +15,9 @@ keywords = ["video-captioning", "multimodal", "gemma", "whisper", "fireworks"]
 dependencies = [
     "fastapi",
     "uvicorn[standard]",
+    # Required by FastAPI to parse multipart/form-data (the /upload endpoint). uvicorn's
+    # [standard] extra already brings the websockets library for the progress stream.
+    "python-multipart",
     "pydantic>=2",
     "httpx",
     "tenacity",

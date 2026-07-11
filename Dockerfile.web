@@ -17,9 +17,13 @@ RUN apt-get update \
 WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 COPY claris ./claris
+# Installs from the locked deps, which now include python-multipart (needed by /upload).
+# The websockets library for /ws is already pulled in by uvicorn[standard].
 RUN uv sync --locked --no-dev
 
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1
 EXPOSE 8000
-CMD ["uvicorn", "claris.api.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+# Bind the platform-provided $PORT (Railway/Render inject it) with a local fallback, so the
+# service is reachable and its health check passes. Shell form is required for $PORT to expand.
+CMD ["sh", "-c", "uvicorn claris.api.main:create_app --factory --host 0.0.0.0 --port ${PORT:-8000}"]
