@@ -28,4 +28,4 @@ EXPOSE 8000
 # service is reachable and its health check passes. Shell form is required for $PORT to expand.
 # Target the module-level `app` (not the factory) so any uvicorn version / auto-detected
 # command starts a real ASGI app rather than calling the factory per request (a 502 trap).
-CMD ["sh", "-c", "uvicorn claris.api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "which python && python --version && which uvicorn && uvicorn --version && python -m uvicorn claris.api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
