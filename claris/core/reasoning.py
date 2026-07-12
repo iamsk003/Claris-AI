@@ -45,23 +45,27 @@ _STYLE_KEYS: dict[StyleName, str] = {
 _SYSTEM = (
     "You are a precise video analyst. You are given a handful of keyframes sampled IN ORDER "
     "from ONE short video, plus a JSON object of timestamped evidence extracted from it "
-    "(transcript, on-screen text, audio events, motion). Reason about the video AS A WHOLE — "
-    "what happens, who/what is involved, and how it unfolds over time. Do NOT describe the "
-    "frames as separate images. Ground every statement in the frames and the given evidence; "
-    "never invent facts, names, brands, or numbers that are not supported. Reply with ONE "
-    "JSON object and nothing else."
+    "(transcript, on-screen text, audio events, motion). Reason about the video AS A WHOLE, "
+    "not as separate images: infer the single sequence of events that ties the frames "
+    "together and describe them in chronological order. "
+    "Use the transcript as the primary source of what is said whenever it is present. Rely on "
+    "on-screen text only when it is actually visible in a frame. Do NOT invent objects, "
+    "people, names, brands, numbers, or actions that the frames and evidence do not support; "
+    "when something is uncertain, write \"appears to\" rather than stating it as fact. "
+    "Reply with ONE JSON object and nothing else."
 )
 
 # Concise per-style voice guides (distilled from generation/styles/*.yaml). Kept inline so
 # the single prompt is self-contained and cheap to build.
 _STYLE_GUIDE = (
-    "captions must all describe the SAME real content but sound distinct:\n"
+    "All four captions must state the SAME facts in the same chronological order — identical "
+    "content, differing only in tone — and each is 1-2 concise, natural sentences:\n"
     "- formal: neutral third-person record of what occurs; no opinion, no contractions, "
     "no exclamation.\n"
     "- sarcastic: dry, wry understatement or mock-praise; still factually correct.\n"
     "- tech_humor: playful joke using software/engineering metaphors.\n"
     "- everyday_humor: light relatable everyday joke, no tech jargon.\n"
-    "Each caption is one or two sentences, natural and concise."
+    "Humor may add flavor but must not add, drop, or change any fact."
 )
 
 
@@ -93,8 +97,9 @@ def build_prompt(evidence: dict, n_frames: int) -> str:
     return (
         f"{n_frames} keyframes from the video are attached, in chronological order.\n\n"
         f"EVIDENCE (timestamps in seconds):\n{json.dumps(evidence, ensure_ascii=False)}\n\n"
-        f"First write a canonical caption: a faithful, concise account of the whole video. "
-        f"Then rewrite it in each of the four styles. {_STYLE_GUIDE}\n\n"
+        f"First write a canonical caption: a faithful, concise (1-2 sentence) account of the "
+        f"whole video, with events in the order they occur. Then restate that SAME account in "
+        f"each of the four styles without changing any fact. {_STYLE_GUIDE}\n\n"
         f"Set \"grounded\" false if the evidence and frames are too thin to caption "
         f"reliably. Set each \"modalities\" flag by whether you actually used that channel.\n\n"
         f"Return ONLY this JSON object:\n{schema}"
@@ -244,9 +249,15 @@ async def reason_over_clip(
         data, tier, model = None, ProviderTier.TEMPLATE, "unavailable"
 
     task_result = reasoning_to_result(task, ledger, data, tier=tier, model=model, run_id=run_id)
+    modalities = (data or {}).get("modalities") if isinstance(data, dict) else None
+    if not (isinstance(modalities, dict) and any(modalities.values())):
+        # Model under-reported/omitted them: fall back to the evidence actually present.
+        modalities = {"speech_used": bool(evidence["transcript"]),
+                      "ocr_used": bool(evidence["ocr"]),
+                      "audio_used": bool(evidence["audio_events"])}
     _emit(sink, run_id, task.task_id, "reasoning_done",
           grounded=(data or {}).get("grounded") if isinstance(data, dict) else False,
-          modalities=(data or {}).get("modalities") if isinstance(data, dict) else None,
+          modalities=modalities,
           degraded=task_result.degraded, parsed=data is not None)
     return task_result
 
