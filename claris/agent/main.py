@@ -62,13 +62,6 @@ class _UnavailableProvider:
         raise RuntimeError(f"no model resolved for this role: {self._reason}")
 
 
-def _minilm_embed():
-    from claris.core.verification.config import VerificationConfig
-    from claris.core.verification.separation import _minilm_embed as embed
-    vc = VerificationConfig()
-    return lambda texts: embed(texts, vc)
-
-
 async def resolve_providers(
     cfg: AgentConfig, *, client: httpx.AsyncClient,
     list_fn=None, probe_fn=None,
@@ -84,15 +77,15 @@ async def resolve_providers(
         m = cfg.deployment_model
         roles = ResolvedRoles(vlm=m, gen=m, gate1=m, critic=m,
                               gemma_path_used=is_gemma(m or ""), notes=("dedicated deployment",))
-        return Providers(gen_provider=gen, judge=gen, critic=gen, vision_provider=vis,
-                         embed_fn=_minilm_embed()), roles
+        return Providers(reasoning_provider=vis, gen_provider=gen, judge=gen, critic=gen,
+                         vision_provider=vis), roles
 
     if not cfg.api_key:
         roles = ResolvedRoles(None, None, None, None, False,
                               ("no FIREWORKS_API_KEY; no models reachable",))
         un = _UnavailableProvider("no api key")
-        return Providers(gen_provider=un, judge=un, critic=un, vision_provider=None,
-                         embed_fn=_minilm_embed()), roles
+        return Providers(reasoning_provider=un, gen_provider=un, judge=un, critic=un,
+                         vision_provider=None), roles
 
     lf, pf = make_probes(cfg.base_url, cfg.api_key, client)
     try:
@@ -103,8 +96,8 @@ async def resolve_providers(
             (f"discovery failed ({repr(exc)[:160]}); no models reachable",),
         )
         un = _UnavailableProvider("discovery failed")
-        return Providers(gen_provider=un, judge=un, critic=un, vision_provider=None,
-                         embed_fn=_minilm_embed()), roles
+        return Providers(reasoning_provider=un, gen_provider=un, judge=un, critic=un,
+                         vision_provider=None), roles
     roles = resolve_roles(models)
 
     def chat(model: Optional[str]):
@@ -114,9 +107,10 @@ async def resolve_providers(
 
     vision = (FireworksVisionProvider(base_url=cfg.base_url, model=roles.vlm,
                                       api_key=cfg.api_key, client=client) if roles.vlm else None)
-    return Providers(gen_provider=chat(roles.gen), judge=chat(roles.gate1),
-                     critic=chat(roles.critic), vision_provider=vision,
-                     embed_fn=_minilm_embed()), roles
+    reasoning = vision if vision is not None else _UnavailableProvider("no multimodal model")
+    return Providers(reasoning_provider=reasoning, gen_provider=chat(roles.gen),
+                     judge=chat(roles.gate1), critic=chat(roles.critic),
+                     vision_provider=vision), roles
 
 
 def read_tasks(input_path: str) -> list[Task]:
