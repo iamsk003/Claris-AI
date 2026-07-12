@@ -38,6 +38,12 @@ from claris.core.schema import (
 
 PipelineFn = Callable[..., Awaitable[TaskResult]]
 
+# Operational failures at the startup boundaries (env parsing, provider discovery) degrade
+# to a clean exit 0. Programming errors (AttributeError, TypeError, KeyError, ...) are
+# deliberately NOT caught so real bugs stay visible. An unwritable /output is intentionally
+# left to fail: with no results.json the evaluator gets nothing, so it must not exit 0.
+_STARTUP_ERRORS = (OSError, ValueError, httpx.HTTPError)
+
 
 def _stderr(msg: str) -> None:
     print(msg, file=sys.stderr, flush=True)
@@ -231,9 +237,17 @@ def _log_resolution(roles: ResolvedRoles) -> None:
 
 
 async def _amain() -> int:
-    cfg = AgentConfig.from_env()
+    try:
+        cfg = AgentConfig.from_env()
+    except _STARTUP_ERRORS as exc:  # bad env config -> degrade, don't crash the container
+        _stderr(f"[claris] startup: cannot build config, exiting 0: {exc!r}")
+        return 0
     async with httpx.AsyncClient() as client:
-        providers, roles = await resolve_providers(cfg, client=client)
+        try:
+            providers, roles = await resolve_providers(cfg, client=client)
+        except _STARTUP_ERRORS as exc:  # provider/discovery init -> degrade, don't crash
+            _stderr(f"[claris] startup: provider resolution failed, exiting 0: {exc!r}")
+            return 0
         _log_resolution(roles)
 
         if cfg.strict:
