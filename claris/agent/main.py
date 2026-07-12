@@ -15,6 +15,7 @@ import asyncio
 import json
 import os
 import sys
+import traceback
 from pathlib import Path
 from typing import Awaitable, Callable, Optional
 
@@ -201,9 +202,14 @@ async def run_agent(
                 timeout=min(cfg.task_timeout_s, remaining),
             )
         except Exception as exc:  # noqa: BLE001 — one bad clip must not sink the batch
+            # TEMP instrumentation: surface the real failure (behavior unchanged).
             sink.emit(RunEvent(run_id=run_id, event_id=f"{run_id}:{task.task_id}:task_failed",
                                stage="agent", event_type="task_failed", level="error",  # type: ignore[arg-type]
-                               task_id=task.task_id, payload={"error": repr(exc)}))
+                               task_id=task.task_id,
+                               payload={"error": repr(exc),
+                                        "exc_type": type(exc).__name__,
+                                        "exc_msg": str(exc),
+                                        "traceback": traceback.format_exc()}))
             result = _degraded_result(task, run_id, repr(exc))
 
         results.append(result)

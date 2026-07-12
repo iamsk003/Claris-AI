@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import re
+import traceback
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -237,6 +238,7 @@ async def reason_over_clip(
             exc_msg=str(exc)[:500],
             http_status=getattr(resp, "status_code", None),
             response_body=body[:1000] if isinstance(body, str) else None,
+            traceback=traceback.format_exc(),
             error=repr(exc)[:200],
         )
         data, tier, model = None, ProviderTier.TEMPLATE, "unavailable"

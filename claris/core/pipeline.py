@@ -87,7 +87,8 @@ async def run_pipeline(
     """Full pipeline from a video file: perception (bundle) then the single reasoning call."""
     sink = sink or NullSink()
     run_id = run_id or f"pipe_{task.task_id}_{utcnow().strftime('%Y%m%dT%H%M%S')}"
-
+    for _retired in ("use_gates", "gen_config", "ver_config", "registry"):
+        perception_kwargs.pop(_retired, None)
     _emit(sink, run_id, task.task_id, "perception_start")
     bundle = await build_perception(task, perception_config, sink=sink, **perception_kwargs)
     _emit(sink, run_id, task.task_id, "perception_done",

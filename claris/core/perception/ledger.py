@@ -10,6 +10,7 @@ the whole path can run offline with fakes.
 from __future__ import annotations
 
 import asyncio
+import traceback
 from typing import Callable, Optional
 
 from claris.core.observability import EventSink, NullSink
@@ -140,12 +141,16 @@ async def _collect_signals(
 
     def _warn(stage: str, exc: Exception) -> None:
         # One failing modality must not sink the whole ledger — partial credit is credit.
+        # TEMP instrumentation: full type/message/traceback (behavior unchanged).
         sink.emit(RunEvent(
             run_id=f"perception_{task.task_id}",
             event_id=f"perception_{task.task_id}:{stage}_failed",
             stage="perception", event_type="stage_failed",
             level="warn",  # type: ignore[arg-type]
-            task_id=task.task_id, payload={"stage": stage, "error": repr(exc)[:200]},
+            task_id=task.task_id,
+            payload={"stage": stage, "error": repr(exc)[:200],
+                     "exc_type": type(exc).__name__, "exc_msg": str(exc),
+                     "traceback": traceback.format_exc()},
         ))
 
     try:
