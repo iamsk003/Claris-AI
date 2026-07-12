@@ -227,10 +227,8 @@ async def run_agent(
 
 def _log_resolution(roles: ResolvedRoles) -> None:
     _stderr("[claris] model resolution:")
-    _stderr(f"  vlm    = {roles.vlm}")
-    _stderr(f"  gen    = {roles.gen}")
-    _stderr(f"  gate_1 = {roles.gate1}")
-    _stderr(f"  critic = {roles.critic}")
+    _stderr(f"  reasoning  = {roles.vlm}")
+    _stderr(f"  generation = {roles.gen}")
     _stderr(f"  gemma_path_used = {roles.gemma_path_used}")
     for note in roles.notes:
         _stderr(f"  note: {note}")
@@ -262,8 +260,12 @@ async def _amain() -> int:
                 _stderr(f"FATAL (CLARIS_STRICT_MODELS=1): {err}")
                 return 3
 
+        _roles = roles.as_dict()
         metadata = {
-            "resolved_roles": roles.as_dict(),
+            "resolved_roles": {"reasoning": _roles.get("vlm"),
+                               "generation": _roles.get("gen"),
+                               "gemma_path_used": _roles.get("gemma_path_used"),
+                               "notes": _roles.get("notes")},
             "gemma_path_used": roles.gemma_path_used,
             "deployment": cfg.has_deployment,
             "strict": cfg.strict,
