@@ -58,14 +58,37 @@ _SYSTEM = (
 # Concise per-style voice guides (distilled from generation/styles/*.yaml). Kept inline so
 # the single prompt is self-contained and cheap to build.
 _STYLE_GUIDE = (
-    "All four captions must state the SAME facts in the same chronological order — identical "
-    "content, differing only in tone — and each is 1-2 concise, natural sentences:\n"
-    "- formal: neutral third-person record of what occurs; no opinion, no contractions, "
-    "no exclamation.\n"
-    "- sarcastic: dry, wry understatement or mock-praise; still factually correct.\n"
-    "- tech_humor: playful joke using software/engineering metaphors.\n"
-    "- everyday_humor: light relatable everyday joke, no tech jargon.\n"
-    "Humor may add flavor but must not add, drop, or change any fact."
+    "All four captions must describe the EXACT SAME facts in the SAME chronological order. "
+    "Only the writing style changes. Never add, remove, exaggerate, or invent events.\n\n"
+
+    "Natural language is more important than sounding intelligent. "
+    "Write like a human, not like an AI. Prefer simple everyday verbs such as "
+    "\"walks\", \"runs\", \"looks\", \"turns\", \"sits\", \"stands\", "
+    "\"heads toward\", \"comes into view\", \"picks up\", and \"opens\". "
+    "Avoid stiff wording such as \"traverses\", \"characterized by\", "
+    "\"maintaining\", \"executes\", or \"forward movement algorithm\".\n\n"
+
+    "- formal:\n"
+    "Write like a professional documentary narrator or news editor. "
+    "Neutral, concise, chronological, and factual. "
+    "No opinions, no exaggeration, no unnecessary adjectives.\n\n"
+
+    "- sarcastic:\n"
+    "Write one dry observational joke while remaining completely factual. "
+    "The humor should come from irony or understatement, never from inventing events "
+    "or insulting people.\n\n"
+
+    "- tech_humor:\n"
+    "Write like an experienced software engineer making a playful observation. "
+    "Use authentic developer humor such as cache miss, merge conflict, loading, "
+    "runtime error, API call, feature request, debug mode, memory leak, hotfix, "
+    "rollback, dependency hell, null pointer, infinite loop, or compiling. "
+    "Do NOT replace ordinary actions with fake technical descriptions like "
+    "\"executes locomotion algorithm\" or \"forward movement protocol\".\n\n"
+
+    "- everyday_humor:\n"
+    "Write like someone sending a funny text to a friend. "
+    "Warm, light, relatable, conversational, and grounded."
 )
 
 
@@ -97,9 +120,13 @@ def build_prompt(evidence: dict, n_frames: int) -> str:
     return (
         f"{n_frames} keyframes from the video are attached, in chronological order.\n\n"
         f"EVIDENCE (timestamps in seconds):\n{json.dumps(evidence, ensure_ascii=False)}\n\n"
-        f"First write a canonical caption: a faithful, concise (1-2 sentence) account of the "
-        f"whole video, with events in the order they occur. Then restate that SAME account in "
-        f"each of the four styles without changing any fact. {_STYLE_GUIDE}\n\n"
+        f"First write a canonical caption that faithfully describes the complete video in "
+        f"chronological order. The canonical caption should be 1-2 natural sentences using "
+        f"simple, everyday English. Then rewrite that SAME caption into four different tones. "
+        f"Do not change events, order, people, objects, actions, dialogue, or timing. Every "
+        f"style must describe exactly the same video; only the writing style should change. "
+        f"When speech exists, prioritize the transcript over visual guessing. Keep every "
+        f"caption concise and prefer natural wording over impressive wording. {_STYLE_GUIDE}\n\n"
         f"Set \"grounded\" false if the evidence and frames are too thin to caption "
         f"reliably. Set each \"modalities\" flag by whether you actually used that channel.\n\n"
         f"Return ONLY this JSON object:\n{schema}"
