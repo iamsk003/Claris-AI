@@ -22,15 +22,12 @@ COPY pyproject.toml uv.lock README.md ./
 COPY claris ./claris
 RUN uv sync --locked --no-dev
 
-# Pre-download ALL model weights at BUILD time so the container needs no network for model
-# downloads at runtime. sentence-transformers (gate_3) + faster-whisper (ASR) are baked into
-# the image cache under HF_HOME.
+# Pre-download the faster-whisper (ASR) weights at BUILD time so the container needs no
+# network for model downloads at runtime. Baked into the image cache under HF_HOME.
 ENV HF_HOME=/opt/hf-cache \
-    SENTENCE_TRANSFORMERS_HOME=/opt/hf-cache \
     CLARIS_WHISPER_MODEL=base
-# Hard preloads (no `|| true`): a successful build therefore GUARANTEES these caches are
+# Hard preload (no `|| true`): a successful build therefore GUARANTEES the ASR cache is
 # baked, which is what makes HF_HUB_OFFLINE safe in the runtime stage.
-RUN uv run python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
 RUN uv run python -c "from faster_whisper import download_model; download_model('base')"
 
 # ---- runtime stage ----------------------------------------------------------
@@ -51,7 +48,6 @@ COPY eval ./eval
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     HF_HOME=/opt/hf-cache \
-    SENTENCE_TRANSFORMERS_HOME=/opt/hf-cache \
     HF_HUB_OFFLINE=1 \
     TRANSFORMERS_OFFLINE=1 \
     CLARIS_WHISPER_MODEL=base \
