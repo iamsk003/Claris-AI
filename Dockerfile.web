@@ -2,27 +2,43 @@
 # Serves the FastAPI + WebSocket surface (claris.api). The Next.js frontend is
 # built and served separately (see docker-compose.yml).
 
-FROM python:3.11-slim AS runtime
+# ---- build stage: compilers available for any source wheels; NOT shipped ----
+FROM python:3.11-slim AS build
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        ffmpeg \
-        build-essential \
-        gcc \
-        g++ \
-        libgl1 \
-        libglib2.0-0 \
+    && apt-get install -y --no-install-recommends build-essential gcc g++ \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-# Install ONLY third-party deps first (not the local claris project) so the expensive model
-# bakes below stay cached and are NOT invalidated when application source changes.
-# Locked deps include python-multipart (needed by /upload); websockets for /ws comes via
-# uvicorn[standard].
+# Install ONLY third-party deps first (not the local claris project) so the whisper bake below
+# stays cached and is NOT invalidated when application source changes. Locked deps include
+# python-multipart (needed by /upload); websockets for /ws comes via uvicorn[standard].
 COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --locked --no-dev --no-install-project
 
-# Runtime ENV, set once before the model warm-up (Docker ENV persists to later layers).
+# Bake the faster-whisper 'base' weights into HF_HOME at BUILD time so the container performs
+# no ASR download on first inference. `--no-sync` runs in the deps-only venv without installing
+# the not-yet-copied project. Hard step: the image must not ship without the ASR cache.
+# (PaddleOCR has been removed — the vision model reads on-screen text directly from frames.)
+ENV HF_HOME=/opt/hf-cache \
+    CLARIS_WHISPER_MODEL=base
+RUN uv run --no-sync python -c "from faster_whisper import download_model; download_model('base')"
+
+# Application source + install the local project (deps already resolved above).
+COPY claris ./claris
+RUN uv sync --locked --no-dev
+
+# ---- runtime stage: no compilers, only runtime libraries ----
+FROM python:3.11-slim AS runtime
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=build /app/.venv /app/.venv
+COPY --from=build /opt/hf-cache /opt/hf-cache
+COPY claris ./claris
+
 # Offline enforcement (HF_HUB_OFFLINE / TRANSFORMERS_OFFLINE) is deliberately NOT set: if the
 # baked cache is ever incomplete, allow a one-time download rather than degrade (perception
 # already degrades gracefully on model-load failure). HF_HUB_ETAG_TIMEOUT=2 caps the per-load
@@ -33,17 +49,6 @@ ENV PATH="/app/.venv/bin:$PATH" \
     HF_HOME=/opt/hf-cache \
     CLARIS_WHISPER_MODEL=base \
     HF_HUB_ETAG_TIMEOUT=2
-
-# Bake the faster-whisper 'base' weights into HF_HOME at BUILD time so the container performs
-# no ASR download on first inference. `--no-sync` runs in the deps-only venv without installing
-# the not-yet-copied project. Hard step: the image must not ship without the ASR cache.
-# (PaddleOCR has been removed — the vision model reads on-screen text directly from frames.)
-RUN uv run --no-sync python -c "from faster_whisper import download_model; download_model('base')"
-
-# Application source + install the local project (deps already resolved above, so this is
-# the only step a code change re-runs — the model bakes stay cached).
-COPY claris ./claris
-RUN uv sync --locked --no-dev
 
 EXPOSE 8000
 # Bind the platform-provided $PORT (Railway/Render inject it) with a local fallback, so the
